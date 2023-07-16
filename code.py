@@ -4,7 +4,6 @@ import gmaps
 from datetime import datetime
 import pandas as pd
 import random
-
 api_file = open("api.txt", "r")
 api_key = api_file.read()
 api_file.close()
@@ -17,7 +16,7 @@ class Admin():
     reachable_scoots = []
     reachable_stations = []
     candidate_trips = []
-    trips_in_progress = []
+    trips_in_progress = {}
     best_system_trip = None
     closest_trip = None
     fastest_trip = None
@@ -27,6 +26,7 @@ class Admin():
     
     def add_user(user):
         Admin.awaiting_offers[user] = ""
+        Admin.trips_in_progress[user] = ""
 
     def clear_lists(self):   
         del Request.user_requests[0]
@@ -262,7 +262,7 @@ class Admin():
                     flag = 1
             if flag == 1:
                 self.suggested_trips.append(self.selected_trip)
-                self.candidate_trips.remove(self.selected_trip)
+                self.candidate_trips.remove(self.selected_trip) # extra, doesnt matter
                 x = self.candidate_trips
                 for trip in x:
                     if trip[2] > self.selected_trip[2]:
@@ -272,7 +272,6 @@ class Admin():
                 return
 
             x = self.candidate_trips
-            walking_time = 15
             flag = 0
             for trip in x:
                 if (trip[5] < 75) and (trip[5] >= 50) and (trip[2] < walking_time):
@@ -292,7 +291,6 @@ class Admin():
                 return
 
             x = self.candidate_trips
-            walking_time = 15
             flag = 0
             for trip in x:
                 if (trip[5] < 50) and (trip[5] >= 30) and (trip[2] < walking_time):
@@ -312,7 +310,6 @@ class Admin():
                 return
             
             x = self.candidate_trips
-            walking_time = 15
             flag = 0
             for trip in x:
                 if (trip[5] < 30) and (trip[5] >= 10) and (trip[2] < walking_time):
@@ -328,21 +325,31 @@ class Admin():
             print("zero possible trips")  
             del Request.user_requests[0]
 
+        #check if fastest trip is giving more points than other trips with more time 
+        x = self.suggested_trips
+        for trip in x:
+            if self.fastest_system_trip[5] > trip[5]:
+                self.suggested_trips.remove(trip)
+
         x = self.suggested_trips
         for trip in x:
             trip[0].vech_not_available() # set vechicle unavailable for possible use  
 
+        #order the suggested trips
+        x = self.suggested_trips
+        if len(x)>2:
+            x.sort(key=lambda x: x[5], reverse=True)
+
         x = self.suggested_trips
         for trip in x:    
             Request.user_requests[0].user.awaiting_offers.append(trip)
-        
+
         # !clear multiple lists and variables!
         self.clear_lists()
           
     def present_trip(self,trip):
 
         t = trip
-        print(trip)
         gmaps.configure(api_key)
         # define scooter location and station location
         start = (float(t[0].longitude),float(t[0].latitude))
@@ -377,6 +384,7 @@ class Admin():
         fig.add_layer(drawing1)
         fig.add_layer(drawing2)
         print("walking time: ",t[2],"mins")
+        display(fig)
         return fig; 
 
 class User():
@@ -420,11 +428,13 @@ class User():
             i = int(input())
             
             if i != 0:
-                Admin.trips_in_progress.append(self,x[i-1])
+                Admin.trips_in_progress[self] = x[i-1]
                 for n in range(0,len(x)-1):
                     if n != i:
                         x[n][0].vech_available()
-                admin.present_trip(x[i-1])
+                #admin.present_trip(x[i-1])
+                Admin.present_trip(admin,x[i-1])
+                
 
             else:
                 for n in range(0,len(x)-1):
@@ -433,7 +443,8 @@ class User():
         else:
             print("", self.username, " there are no trip offers available")
         
-        Admin.awaiting_offers[self] = []    
+        admin.awaiting_offers[self] = ''   
+        self.awaiting_offers = []
    
                 
     def update_level(self):
@@ -446,7 +457,7 @@ class User():
 
 class Request():
     user_requests = []
-    def __init__(self, user, longitude, latitude, dest_long, dest_lat, tolerance):
+    def __init__(self, user, longitude, latitude, dest_long, dest_lat):
         self.user = user
         self.longitude = longitude  
         self.latitude = latitude
@@ -616,6 +627,7 @@ user1.see_offers()
 
 ##----------------------------------------------------------------------------
 ## get stats
+## extra
 
 import folium
 
